@@ -34,6 +34,7 @@ from .utils.tensor_cropper import transform_points
 from .datasets import datasets
 from .utils.config import cfg
 torch.backends.cudnn.benchmark = True
+from scipy.spatial.transform import Rotation as R
 
 class DECA(nn.Module):
     def __init__(self, config=None, device='cuda'):
@@ -85,7 +86,7 @@ class DECA(nn.Module):
         # resume model
         model_path = self.cfg.pretrained_modelpath
         if os.path.exists(model_path):
-            print(f'trained model found. load {model_path}')
+            print(f'[DECA] trained model found. load {model_path}')
             checkpoint = torch.load(model_path)
             self.checkpoint = checkpoint
             util.copy_state_dict(self.E_flame.state_dict(), checkpoint['E_flame'])
@@ -156,15 +157,25 @@ class DECA(nn.Module):
         return codedict
 
     # @torch.no_grad()
-    def decode(self, codedict, rendering=True, iddict=None, vis_lmk=True, return_vis=True, use_detail=True,
-                render_orig=False, original_image=None, tform=None, add_light=True, th=0,
-                align_ffhq=False, return_ffhq_center=False, ffhq_center=None,
-                light_type='point', render_norm=False):
+    def decode(self, codedict, rendering=True, custom_mesh=None,
+               iddict=None, vis_lmk=True, return_vis=True, use_detail=True,
+               render_orig=False, original_image=None, tform=None, add_light=True,
+               th=0, align_ffhq=False, return_ffhq_center=False, ffhq_center=None,
+               custom_rotation=None,
+               light_type='point', render_norm=False):
         images = codedict['images']
         batch_size = images.shape[0]
 
         ## decode
         verts, landmarks2d, landmarks3d = self.flame(shape_params=codedict['shape'], expression_params=codedict['exp'], pose_params=codedict['pose'])
+        ###3: change to custom_verts 
+        # first attempt _1 here
+        if custom_mesh is not None:
+            verts = custom_mesh
+
+        ## Change pose
+        if custom_rotation is not None:
+            verts @= custom_rotation
 
         if (align_ffhq and ffhq_center is not None) or return_ffhq_center:
             lm_eye_left = landmarks2d[:, 36:42]  # left-clockwise
