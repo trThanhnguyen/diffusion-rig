@@ -3,8 +3,12 @@ import os
 import sys
 import tqdm
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(SCRIPT_DIR))
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from utils.read_mesh import read_obj_to_tensor
 import torch as th
 from glob import glob
 
@@ -50,12 +54,13 @@ def create_inter_data(dataset, modes, meshes_path, y_rot, meanshape_path=""):
         code1 = deca.encode(img1)
     # image2 = dataset[-1]["original_image"].unsqueeze(0).to("cuda")
 
-    custom_meshes = read_meshes_from_dir(meshes_path)
+    mesh_paths = sorted(glob(f"{meshes_path}/*.obj"))
     # manually editing head pose with args
     angle = y_rot
 
-    for mesh in tqdm.tqdm(custom_meshes, desc="Passing meshes..."):
-        mesh = mesh.unsqueeze(0).to("cuda")
+    for path in tqdm.tqdm(mesh_paths, desc="Batching data"):
+        mesh = read_obj_to_tensor(path)
+        mesh = mesh.to("cuda")
 
         # img1 = dataset[i]["image"].unsqueeze(0).to("cuda")
 
@@ -187,7 +192,7 @@ def main():
         sample = sample.contiguous()
 
         save_image(
-            sample, os.path.join(vis_dir, "{}_".format(idx) + batch["mode"]) + ".png"
+            sample, os.path.join(vis_dir, f"{idx:04d}_{batch['mode']}.png")
         )
 
 
